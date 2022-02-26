@@ -1,9 +1,6 @@
 import React from "react";
+import Map from "./map";
 
-const HomeContent = () => (
-  <div className="next-steps">
-    <h2>Please login first</h2>
-  </div>
-);
+const HomeContent = () => <Map />;
 
 export default HomeContent;

@@ -2,10 +2,6 @@ import React, { Fragment } from "react";
 
 import { HomeContent } from "../components";
 
-const Home = () => (
-  <Fragment>
-    <HomeContent />
-  </Fragment>
-);
+const Home = () => <HomeContent />;
 
 export default Home;
