@@ -34,14 +34,20 @@
 </head>
 
 <body>
-    <div id="map"></div>
-    <script>
-        //  OXFORD ###########
-        // const truckLocation = [-1.25775, 51.75191];
-        // const warehouseLocation = [-1.25935, 51.75591];
 
-        //  LONDON
-        const truckLocation = [-0.14482, 51.51975];
+    <!-- SEARCH BAR: Load the `mapbox-gl-geocoder` plugin. -->
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.2/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.2/mapbox-gl-geocoder.css"
+        type="text/css">
+
+    <div id="map"></div>
+
+    <script>
+
+        const truckLocation = [-1.25775, 51.75191]; // OXFORD
+        // const truckLocation = [-0.14482, 51.51975]; // LONDON
 
         const lastAtRestaurant = 0;
         let keepTrack = [];
@@ -53,10 +59,19 @@
         // Initialize a map
         const map = new mapboxgl.Map({
             container: 'map', // container id
-            style: 'mapbox://styles/mapbox/light-v10', // stylesheet location
+            // style: 'mapbox://styles/mapbox/light-v10', // stylesheet location
+            style: 'mapbox://styles/mapbox/streets-v11', // stylesheet location
             center: truckLocation, // starting position
             zoom: 12 // starting zoom
         });
+
+        // SEARCH BAR: Add the control to the map.
+        map.addControl(
+            new MapboxGeocoder({
+                accessToken: mapboxgl.accessToken,
+                mapboxgl: mapboxgl
+            })
+        );
 
         // Create an empty GeoJSON feature collection for drop off locations
         const dropoffs = turf.featureCollection([]);
@@ -68,8 +83,8 @@
             const marker = document.createElement('div');
             marker.classList = 'truck';
 
-            // Create a new marker
-            new mapboxgl.Marker(marker).setLngLat(truckLocation).addTo(map);
+            // Create a new marker (BLUE DOT)
+            // new mapboxgl.Marker(marker).setLngLat(truckLocation).addTo(map);
 
             map.addLayer({
                 id: 'dropoffs-symbol',
