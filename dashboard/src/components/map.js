@@ -18,19 +18,61 @@ const stores = {
         coordinates: [-1.26012, 51.75577],
       },
       properties: {
-        title: "Mapbox DC",
-        "marker-symbol": "monument",
+        title: "Museum",
       },
     },
   ],
 };
 
-const Map = () => {
+const homeless = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [-1.2632552, 51.7548614],
+      },
+      properties: {
+        title: "Temple",
+      },
+    },
+  ],
+};
+
+const Map = (props) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   //   // coordinates for Oxford
   const initialZoom = [14];
   const [x, y] = [-1.26012, 51.75577];
+
+  const flyToStore = (currentFeature) => {
+    map.current.flyTo({
+      center: currentFeature.geometry.coordinates,
+      zoom: 15,
+    });
+  };
+
+  const addMarkers = () => {
+    for (const marker of homeless.features) {
+      const el = document.createElement("div");
+      el.id = `marker-${marker.properties.id}`;
+      el.className = "marker";
+
+      new mapboxgl.Marker(el, { offset: [0, -23] })
+        .setLngLat(marker.geometry.coordinates)
+        .addTo(map.current);
+
+      el.addEventListener("click", () => {
+        flyToStore(marker);
+        props.onClickMarker({
+          geom: marker.geometry,
+          properties: marker.properties,
+        });
+      });
+    }
+  };
 
   useEffect(() => {
     if (map.current) return; // initialize map only once
@@ -42,8 +84,6 @@ const Map = () => {
     });
 
     map.current.on("load", () => {
-      /* Add the data to your map as a layer */
-      console.log("stores :>> ", stores);
       map.current.addLayer({
         id: "locations",
         type: "circle",
@@ -52,26 +92,33 @@ const Map = () => {
           data: stores,
         },
       });
+
+      map.current.addSource("homeless", {
+        type: "geojson",
+        data: homeless,
+      });
+
+      addMarkers();
+    });
+
+    map.current.on("click", (event) => {
+      const features = map.current.queryRenderedFeatures(event.point, {
+        layers: ["locations"],
+      });
+      if (!features.length) return;
+
+      const clickedPoint = features[0];
+      flyToStore(clickedPoint);
+      props.onClickMarker({
+        geom: clickedPoint._geometry,
+        properties: clickedPoint.properties,
+      });
     });
   });
 
-  // <div ref={mapContainer} className="h-100" />
   return (
     <div className="h-100 flex-grow-1">
       <div ref={mapContainer} className="h-100" />
-      {/* <M
-        style="mapbox://styles/mapbox/streets-v9"
-        center={[x, y]}
-        zoom={initialZoom}
-        containerStyle={{
-          height: "100vh",
-          width: "100vw",
-        }}
-      >
-        <Source id="source_id" geoJsonSource={stores} />
-        <Layer type="circle" id="layer_id" sourceId="source_id" />
-      </M>
-      ; */}
     </div>
   );
 };
