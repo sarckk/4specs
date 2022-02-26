@@ -4,9 +4,10 @@
   "private": true,
   "dependencies": {
     "@auth0/auth0-react": "^1.1.0",
-    "mapbox-gl": "^2.7.0",
+    "mapbox-gl": "^1.13.2",
     "react": "^16.14.0",
     "react-dom": "^16.14.0",
+    "react-mapbox-gl": "^5.1.1",
     "react-router-dom": "^5.2.0",
     "react-scripts": "4.0.0"
   },

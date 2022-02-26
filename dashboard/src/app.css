@@ -14,3 +14,10 @@
 .result-block-container .result-block {
   opacity: 1;
 }
+
+.sidebar {
+  background-color: white;
+  height: 100%;
+  width: 300px;
+  padding: 0 20px;
+}
