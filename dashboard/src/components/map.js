@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import mapboxgl from "!mapbox-gl"; // eslint-disable-line import/no-webpack-loader-syntax
+import * as MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
+import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
+
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
 
 // import ReactMapboxGl, { Layer, Source } from "react-mapbox-gl";
@@ -99,6 +102,15 @@ const Map = (props) => {
       });
 
       addMarkers();
+
+      const geocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken, // Set the access token
+        mapboxgl: mapboxgl, // Set the mapbox-gl instance
+        marker: true, // Use the geocoder's default marker style
+        bbox: [-77.210763, 38.803367, -76.853675, 39.052643], // Set the bounding box coordinates
+      });
+
+      map.current.addControl(geocoder, "top-left");
     });
 
     map.current.on("click", (event) => {
