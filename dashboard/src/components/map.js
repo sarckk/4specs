@@ -7,6 +7,7 @@ import homelesscondensed from "../data/homelesscondensed.geojson";
 import * as turf from "@turf/turf";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
+console.log("process.env :>> ", process.env);
 
 const restaurants = [
   {
