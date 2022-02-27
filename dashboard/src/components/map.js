@@ -35,6 +35,20 @@ const restaurants = [
     popupHTML: "<h2>Bannisters </h2>10am - 11pm",
   },
 ];
+const homeless_coords = [
+  [-1.25664230769231, 51.7582338461538],
+  [-1.25989692307692, 51.7538753846154],
+  [-1.26904230769231, 51.75918],
+  [-1.23745538461538, 51.74802],
+  [-1.26784538461538, 51.7733607692308],
+];
+
+const homelesses = homeless_coords.map((coord) => {
+  return {
+    lnglat: coord,
+    popupHTML: null,
+  };
+});
 
 const Map = (props) => {
   // Create an empty GeoJSON feature collection for drop off locations
@@ -66,7 +80,6 @@ const Map = (props) => {
   async function addWaypoints(restaurant) {
     // When the map is clicked, add a new drop off point
     // and update the `dropoffs-symbol` layer
-    console.log("restaurant :>> ", restaurant);
     await newDropoff(restaurant.lnglat);
     updateDropoffs(dropoffs);
   }
@@ -178,8 +191,7 @@ const Map = (props) => {
           initialMarker.current = marker;
           startCoords.current = convertLngLatToArr(marker._lngLat);
 
-          for (const restaurant of restaurants) {
-            console.log("restaurant :>> ", restaurant);
+          for (const restaurant of [...restaurants, ...homelesses]) {
             addWaypoints(restaurant);
           }
         });
@@ -353,8 +365,7 @@ const Map = (props) => {
 
         // try to search the surrounding areas using TileQuery
         // add waypoints for each
-        for (const restaurant of restaurants) {
-          console.log("restaurant :>> ", restaurant);
+        for (const restaurant of [...restaurants, ...homelesses]) {
           addWaypoints(restaurant);
         }
       });
