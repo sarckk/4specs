@@ -1,2 +1,10 @@
-# 4specs
-OxfordHack - Path Planning for getting food to Rough Sleepers
+##Homeless Tracking and Food Delivery App 
+#PREAMBLE (CONTEXT)
+A considerable amount of food goes to waste every day in Oxford and all over the UK (e.g., restaurants preparing more food and ingredients than what they eventually sell to consumers). While there are already solutions in place that aim at reducing food waste (e.g., food banks and food aftermarket apps like “Too Good To Go”), there are still additional opportunities to further reduce it. Why? (1) food banks can mostly store only packaged and non-perishable food (2) after using food aftermarket services (e.g., “Too Good To Go”), restaurants still have leftovers, freshly prepared food, that will potentially be thrown away How about finding a way to save it and give it to the homeless?
+
+#LOCATING THE HOMELESS
+Create an app that allows to map the concentration of rough sleepers in the Oxford town centre How? Traffic wardens (police officers/council workers) can submit location of rough sleepers via a web app (accessed from phone browser – or potentially, an app)
+This data can be used by the town council, police department, charities, or potentially commercial businesses willing to provide services to the homeless The app will show a density map of the homeless in town The app will show, given the current location, the most (fuel/time) efficient route to drive through homeless hotspots
+
+#DELIVERING FOOD TO THE HOMELESS
+Example of service: Free Food-to-waste delivery (e.g., unsold from “Too Good To Go”) There are restaurants in town that cook and prepare more food than what they eventually sell to: (1) customers, in the restaurant (2) in the food aftermarket via apps like Too Good To Go The leftover food that could potentially go to waste can instead be distributed for free to homeless people living in the area. This service can, for example, be provided by a charity (with a vehicle and a volunteer) The charity can use the app to visualise the following two routes: (1) the most (fuel/time) efficient route to pick up the food from a selection of restaurants (2) the most (fuel/time) efficient route to follow to drive through the homeless hotspots and deliver the food
