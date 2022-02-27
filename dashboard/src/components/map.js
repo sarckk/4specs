@@ -4,48 +4,18 @@ import * as MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
 import homelesspoints from "../data/homelesspoints.geojson";
 import homelesscondensed from "../data/homelesspoints.geojson";
+import * as turf from "@turf/turf";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
 
-// import ReactMapboxGl, { Layer, Source } from "react-mapbox-gl";
-// import "mapbox-gl/dist/mapbox-gl.css";
-// const M = ReactMapboxGl({
-//   accessToken: process.env.REACT_APP_MAPBOX_ACCESS_TOKEN,
-// });
-
-const stores = {
-  type: "FeatureCollection",
-  features: [
-    {
-      type: "Feature",
-      geometry: {
-        type: "Point",
-        coordinates: [-1.26012, 51.75577],
-      },
-      properties: {
-        title: "Museum",
-      },
-    },
-  ],
-};
-
-// const homeless = {
-//   type: "FeatureCollection",
-//   features: [
-//     {
-//       type: "Feature",
-//       geometry: {
-//         type: "Point",
-//         coordinates: [-1.2632552, 51.7548614],
-//       },
-//       properties: {
-//         title: "Temple",
-//       },
-//     },
-//   ],
-// };
-
 const Map = (props) => {
+  // Create an empty GeoJSON feature collection for drop off locations
+  const dropoffs = turf.featureCollection([]);
+  // Create an empty GeoJSON feature collection, which will be used as the data source for the route before users add any new data
+  const nothing = turf.featureCollection([]);
+  let keepTrack = [];
+  const pointHopper = {};
+
   const mapContainer = useRef(null);
   const map = useRef(null);
   //   // coordinates for Oxford
@@ -55,6 +25,8 @@ const Map = (props) => {
     zoom: 14,
   });
 
+  const initialMarker = useRef(null);
+
   const flyToStore = (coordinates) => {
     map.current.flyTo({
       center: coordinates,
@@ -62,28 +34,94 @@ const Map = (props) => {
     });
   };
 
-  // const addMarkers = () => {
-  //   for (const marker of homeless.features) {
-  //     const el = document.createElement("div");
-  //     el.id = `marker-${marker.properties.id}`;
-  //     el.className = "marker";
+  async function addWaypoints(event) {
+    // When the map is clicked, add a new drop off point
+    // and update the `dropoffs-symbol` layer
+    await newDropoff(map.current.unproject(event.point));
+    updateDropoffs(dropoffs);
+  }
 
-  //     new mapboxgl.Marker(el, { offset: [0, -23] })
-  //       .setLngLat(marker.geometry.coordinates)
-  //       .addTo(map.current);
+  async function newDropoff(coordinates) {
+    // Store the clicked point as a new GeoJSON feature with
+    // two properties: `orderTime` and `key`
+    const pt = turf.point([coordinates.lng, coordinates.lat], {
+      orderTime: Date.now(),
+      key: Math.random(),
+    });
+    dropoffs.features.push(pt);
+    pointHopper[pt.properties.key] = pt;
 
-  //     el.addEventListener("click", () => {
-  //       flyToStore(marker.geometry.coordinates);
-  //       props.onClickMarker(
-  //         {
-  //           geom: marker.geometry,
-  //           properties: marker.properties,
-  //         },
-  //         true
-  //       );
-  //     });
-  //   }
-  // };
+    // Make a request to the Optimization API
+    const query = await fetch(assembleQueryURL(), { method: "GET" });
+    const response = await query.json();
+
+    // Create an alert for any requests that return an error
+    if (response.code !== "Ok") {
+      const handleMessage =
+        response.code === "InvalidInput"
+          ? "Refresh to start a new route. For more information: https://docs.mapbox.com/api/navigation/optimization/#optimization-api-errors"
+          : "Try a different point.";
+      alert(`${response.code} - ${response.message}\n\n${handleMessage}`);
+      // Remove invalid point
+      dropoffs.features.pop();
+      delete pointHopper[pt.properties.key];
+      return;
+    }
+
+    // Create a GeoJSON feature collection
+    const routeGeoJSON = turf.featureCollection([
+      turf.feature(response.trips[0].geometry),
+    ]);
+
+    // Update the `route` source by getting the route source
+    // and setting the data equal to routeGeoJSON
+    map.current.getSource("route").setData(routeGeoJSON);
+  }
+
+  function updateDropoffs(geojson) {
+    map.current.getSource("dropoffs-symbol").setData(geojson);
+  }
+
+  // Here you'll specify all the parameters necessary for requesting a response from the Optimization API
+  function assembleQueryURL() {
+    const initialCoords = [
+      initialMarker.current._lngLat.lng,
+      initialMarker.current._lngLat.lat,
+    ];
+    const coordinates = [initialCoords];
+    const distributions = [];
+    keepTrack = [initialCoords];
+
+    // Create an array of GeoJSON feature collections for each point
+    const restJobs = Object.keys(pointHopper).map((key) => pointHopper[key]);
+
+    // If there are actually orders from this restaurant
+    if (restJobs.length > 0) {
+      const needToPickUp = 0;
+
+      console.log(restJobs);
+
+      for (const job of restJobs) {
+        // Add dropoff to list
+        keepTrack.push(job);
+        coordinates.push(job.geometry.coordinates);
+      }
+    }
+
+    // Set the profile to `driving` (I actually set it to cycling)
+    // Coordinates will include the current location of the truck,
+    return `https://api.mapbox.com/optimized-trips/v1/mapbox/cycling/${coordinates.join(
+      ";"
+    )}?distributions=${distributions.join(
+      ";"
+    )}&overview=full&steps=true&geometries=geojson&source=first&access_token=${
+      mapboxgl.accessToken
+    }`;
+  }
+
+  useEffect(() => {
+    console.log("initialMarker set :>> ", initialMarker);
+  }, [initialMarker]);
 
   useEffect(() => {
     if (map.current) return; // initialize map only once
@@ -95,7 +133,7 @@ const Map = (props) => {
       zoom: mapState.zoom,
     });
 
-    map.current.on("load", () => {
+    map.current.on("load", async () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
           console.log("position :>> ", position);
@@ -107,11 +145,14 @@ const Map = (props) => {
 
           // add a marker here
           const lnglat = [position.coords.longitude, position.coords.latitude];
-          const marker1 = new mapboxgl.Marker()
+          const marker = new mapboxgl.Marker({
+            color: "orange",
+          })
             .setLngLat(lnglat)
             .addTo(map.current);
 
           flyToStore(lnglat);
+          initialMarker.current = marker;
         });
       }
 
@@ -266,16 +307,143 @@ const Map = (props) => {
       const geocoder = new MapboxGeocoder({
         accessToken: mapboxgl.accessToken, // Set the access token
         mapboxgl: mapboxgl, // Set the mapbox-gl instance
-        marker: true, // Use the geocoder's default marker style
+        marker: {
+          color: "orange",
+        }, // Use the geocoder's default marker style
       });
 
       geocoder.on("result", ({ result }) => {
-        console.log("result :>> ", result);
+        // remove initial marker if necessary
+        console.log("initialMarker :>> ", initialMarker.current);
+        if (initialMarker.current != null) {
+          initialMarker.current.remove();
+          initialMarker.current = null;
+        }
+
         // try to search the surrounding areas using TileQuery
         props.onClickMarker({}, true);
       });
 
       map.current.addControl(geocoder, "top-left");
+
+      new mapboxgl.Marker({ color: "red", scale: 0.7 })
+        .setLngLat([-1.2517, 51.736899])
+        .addTo(map.current)
+        .setPopup(
+          new mapboxgl.Popup().setHTML("<h2>Atlantic Fish Bar </h2>10am - 11pm")
+        );
+
+      new mapboxgl.Marker({ color: "red", scale: 0.7 })
+        .setLngLat([-1.268007, 51.752734])
+        .addTo(map.current)
+        .setPopup(
+          new mapboxgl.Popup().setHTML("<h2>Dosa Park </h2>10am - 11pm")
+        );
+
+      new mapboxgl.Marker({ color: "red", scale: 0.7 })
+        .setLngLat([-1.266372, 51.760461])
+        .addTo(map.current)
+        .setPopup(new mapboxgl.Popup().setHTML("<h2>Jamal's </h2>10am - 11pm"));
+
+      new mapboxgl.Marker({ color: "red", scale: 0.7 })
+        .setLngLat([-1.239031, 51.750985])
+        .addTo(map.current)
+        .setPopup(
+          new mapboxgl.Popup().setHTML("<h2>Philly's Burger </h2>10am - 11pm")
+        );
+
+      new mapboxgl.Marker({ color: "red", scale: 0.7 })
+        .setLngLat([-1.236512, 51.741402])
+        .addTo(map.current)
+        .setPopup(
+          new mapboxgl.Popup().setHTML("<h2>Bannisters </h2>10am - 11pm")
+        );
+
+      new mapboxgl.Marker({ color: "red", scale: 0.7 })
+        .setLngLat([-1.231573, 51.768232])
+        .addTo(map.current)
+        .setPopup(new mapboxgl.Popup().setHTML("<h2>Taylors </h2>10am - 11pm"));
+
+      const nav = new mapboxgl.NavigationControl({
+        visualizePitch: true,
+      });
+      map.current.addControl(nav, "bottom-right");
+
+      map.current.addLayer({
+        id: "dropoffs-symbol",
+        type: "symbol",
+        source: {
+          data: dropoffs,
+          type: "geojson",
+        },
+        layout: {
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "icon-image": "marker-15",
+        },
+      });
+
+      const scale = new mapboxgl.ScaleControl({
+        maxWidth: 100,
+        unit: "metric",
+      });
+      map.current.addControl(scale);
+
+      scale.setUnit("metric");
+
+      map.current.addSource("route", {
+        type: "geojson",
+        data: nothing,
+      });
+
+      map.current.addLayer(
+        {
+          id: "routeline-active",
+          type: "line",
+          source: "route",
+          layout: {
+            "line-join": "round",
+            "line-cap": "round",
+          },
+          paint: {
+            "line-color": "#3887be",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 12, 3, 22, 12],
+          },
+        },
+        "waterway-label"
+      );
+
+      map.current.addLayer(
+        {
+          id: "routearrows",
+          type: "symbol",
+          source: "route",
+          layout: {
+            "symbol-placement": "line",
+            "text-field": "▶",
+            "text-size": ["interpolate", ["linear"], ["zoom"], 12, 24, 22, 60],
+            "symbol-spacing": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              30,
+              22,
+              160,
+            ],
+            "text-keep-upright": false,
+          },
+          paint: {
+            "text-color": "#3887be",
+            "text-halo-color": "hsl(55, 11%, 96%)",
+            "text-halo-width": 3,
+          },
+        },
+        "waterway-label"
+      );
+
+      // Listen for a click on the map
+      await map.current.on("click", addWaypoints);
     });
 
     map.current.on("click", (event) => {
