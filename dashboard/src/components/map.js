@@ -3,10 +3,37 @@ import mapboxgl from "!mapbox-gl"; // eslint-disable-line import/no-webpack-load
 import * as MapboxGeocoder from "@mapbox/mapbox-gl-geocoder";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
 import homelesspoints from "../data/homelesspoints.geojson";
-import homelesscondensed from "../data/homelesspoints.geojson";
+import homelesscondensed from "../data/homelesscondensed.geojson";
 import * as turf from "@turf/turf";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
+
+const restaurants = [
+  {
+    lnglat: [-1.2517, 51.736899],
+    popupHTML: "<h2>Atlantic Fish Bar </h2>10am - 11pm",
+  },
+  {
+    lnglat: [-1.268007, 51.752734],
+    popupHTML: "<h2>Dosa Park </h2>10am - 11pm",
+  },
+  {
+    lnglat: [-1.266372, 51.760461],
+    popupHTML: "<h2>Jamal's </h2>10am - 11pm",
+  },
+  {
+    lnglat: [-1.239031, 51.750985],
+    popupHTML: "<h2>Philly's Burger </h2>10am - 11pm",
+  },
+  {
+    lnglat: [-1.236512, 51.741402],
+    popupHTML: "<h2>Bannisters </h2>10am - 11pm",
+  },
+  {
+    lnglat: [-1.236512, 51.741402],
+    popupHTML: "<h2>Bannisters </h2>10am - 11pm",
+  },
+];
 
 const Map = (props) => {
   // Create an empty GeoJSON feature collection for drop off locations
@@ -35,18 +62,18 @@ const Map = (props) => {
 
   const convertLngLatToArr = (lnglat) => [lnglat.lng, lnglat.lat];
 
-  async function addWaypoints(event) {
+  async function addWaypoints(restaurant) {
     // When the map is clicked, add a new drop off point
     // and update the `dropoffs-symbol` layer
-    console.log("Called");
-    await newDropoff(map.current.unproject(event.point));
+    console.log("restaurant :>> ", restaurant);
+    await newDropoff(restaurant.lnglat);
     updateDropoffs(dropoffs);
   }
 
   async function newDropoff(coordinates) {
     // Store the clicked point as a new GeoJSON feature with
     // two properties: `orderTime` and `key`
-    const pt = turf.point([coordinates.lng, coordinates.lat], {
+    const pt = turf.point(coordinates, {
       orderTime: Date.now(),
       key: Math.random(),
     });
@@ -69,9 +96,8 @@ const Map = (props) => {
   }
 
   const reset = () => {
-    // map.current.removeLayer("routeline-active");
-    // map.current.removeLayer("dropoffs-symbol");
     map.current.setLayoutProperty("routeline-active", "visibility", "none");
+    map.current.setLayoutProperty("routearrows", "visibility", "none");
     map.current.getSource("route").setData(turf.featureCollection([]));
     map.current
       .getSource("dropoffs-symbol")
@@ -150,6 +176,11 @@ const Map = (props) => {
           flyToStore(lnglat);
           initialMarker.current = marker;
           startCoords.current = convertLngLatToArr(marker._lngLat);
+
+          for (const restaurant of restaurants) {
+            console.log("restaurant :>> ", restaurant);
+            addWaypoints(restaurant);
+          }
         });
       }
 
@@ -320,47 +351,21 @@ const Map = (props) => {
         reset();
 
         // try to search the surrounding areas using TileQuery
+        // add waypoints for each
+        for (const restaurant of restaurants) {
+          console.log("restaurant :>> ", restaurant);
+          addWaypoints(restaurant);
+        }
       });
 
       map.current.addControl(geocoder, "top-left");
 
-      new mapboxgl.Marker({ color: "red", scale: 0.7 })
-        .setLngLat([-1.2517, 51.736899])
-        .addTo(map.current)
-        .setPopup(
-          new mapboxgl.Popup().setHTML("<h2>Atlantic Fish Bar </h2>10am - 11pm")
-        );
-
-      new mapboxgl.Marker({ color: "red", scale: 0.7 })
-        .setLngLat([-1.268007, 51.752734])
-        .addTo(map.current)
-        .setPopup(
-          new mapboxgl.Popup().setHTML("<h2>Dosa Park </h2>10am - 11pm")
-        );
-
-      new mapboxgl.Marker({ color: "red", scale: 0.7 })
-        .setLngLat([-1.266372, 51.760461])
-        .addTo(map.current)
-        .setPopup(new mapboxgl.Popup().setHTML("<h2>Jamal's </h2>10am - 11pm"));
-
-      new mapboxgl.Marker({ color: "red", scale: 0.7 })
-        .setLngLat([-1.239031, 51.750985])
-        .addTo(map.current)
-        .setPopup(
-          new mapboxgl.Popup().setHTML("<h2>Philly's Burger </h2>10am - 11pm")
-        );
-
-      new mapboxgl.Marker({ color: "red", scale: 0.7 })
-        .setLngLat([-1.236512, 51.741402])
-        .addTo(map.current)
-        .setPopup(
-          new mapboxgl.Popup().setHTML("<h2>Bannisters </h2>10am - 11pm")
-        );
-
-      new mapboxgl.Marker({ color: "red", scale: 0.7 })
-        .setLngLat([-1.231573, 51.768232])
-        .addTo(map.current)
-        .setPopup(new mapboxgl.Popup().setHTML("<h2>Taylors </h2>10am - 11pm"));
+      for (const restaurant of restaurants) {
+        new mapboxgl.Marker({ color: "red", scale: 0.7 })
+          .setLngLat(restaurant.lnglat)
+          .addTo(map.current)
+          .setPopup(new mapboxgl.Popup().setHTML(restaurant.popupHTML));
+      }
 
       const nav = new mapboxgl.NavigationControl({
         visualizePitch: true,
@@ -411,37 +416,34 @@ const Map = (props) => {
         "waterway-label"
       );
 
-      // map.current.addLayer(
-      //   {
-      //     id: "routearrows",
-      //     type: "symbol",
-      //     source: "route",
-      //     layout: {
-      //       "symbol-placement": "line",
-      //       "text-field": "▶",
-      //       "text-size": ["interpolate", ["linear"], ["zoom"], 12, 24, 22, 60],
-      //       "symbol-spacing": [
-      //         "interpolate",
-      //         ["linear"],
-      //         ["zoom"],
-      //         12,
-      //         30,
-      //         22,
-      //         160,
-      //       ],
-      //       "text-keep-upright": false,
-      //     },
-      //     paint: {
-      //       "text-color": "#3887be",
-      //       "text-halo-color": "hsl(55, 11%, 96%)",
-      //       "text-halo-width": 3,
-      //     },
-      //   },
-      //   "waterway-label"
-      // );
-
-      // Listen for a click on the map
-      await map.current.on("click", addWaypoints);
+      map.current.addLayer(
+        {
+          id: "routearrows",
+          type: "symbol",
+          source: "route",
+          layout: {
+            "symbol-placement": "line",
+            "text-field": "▶",
+            "text-size": ["interpolate", ["linear"], ["zoom"], 12, 24, 22, 60],
+            "symbol-spacing": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              12,
+              30,
+              22,
+              160,
+            ],
+            "text-keep-upright": false,
+          },
+          paint: {
+            "text-color": "#3887be",
+            "text-halo-color": "hsl(55, 11%, 96%)",
+            "text-halo-width": 3,
+          },
+        },
+        "waterway-label"
+      );
     });
   });
 
