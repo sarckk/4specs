@@ -10,11 +10,9 @@ mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
 
 const Map = (props) => {
   // Create an empty GeoJSON feature collection for drop off locations
-  const dropoffs = turf.featureCollection([]);
-  // Create an empty GeoJSON feature collection, which will be used as the data source for the route before users add any new data
-  const nothing = turf.featureCollection([]);
-  let keepTrack = [];
-  const pointHopper = {};
+  const [dropoffs, setDropoffs] = useState(turf.featureCollection([]));
+  const [keepTrack, setKeepTrack] = useState([]);
+  let pointHopper = [];
 
   const mapContainer = useRef(null);
   const map = useRef(null);
@@ -26,6 +24,7 @@ const Map = (props) => {
   });
 
   const initialMarker = useRef(null);
+  const startCoords = useRef(null);
 
   const flyToStore = (coordinates) => {
     map.current.flyTo({
@@ -34,9 +33,12 @@ const Map = (props) => {
     });
   };
 
+  const convertLngLatToArr = (lnglat) => [lnglat.lng, lnglat.lat];
+
   async function addWaypoints(event) {
     // When the map is clicked, add a new drop off point
     // and update the `dropoffs-symbol` layer
+    console.log("Called");
     await newDropoff(map.current.unproject(event.point));
     updateDropoffs(dropoffs);
   }
@@ -49,24 +51,11 @@ const Map = (props) => {
       key: Math.random(),
     });
     dropoffs.features.push(pt);
-    pointHopper[pt.properties.key] = pt;
+    pointHopper.push(pt);
 
     // Make a request to the Optimization API
     const query = await fetch(assembleQueryURL(), { method: "GET" });
     const response = await query.json();
-
-    // Create an alert for any requests that return an error
-    if (response.code !== "Ok") {
-      const handleMessage =
-        response.code === "InvalidInput"
-          ? "Refresh to start a new route. For more information: https://docs.mapbox.com/api/navigation/optimization/#optimization-api-errors"
-          : "Try a different point.";
-      alert(`${response.code} - ${response.message}\n\n${handleMessage}`);
-      // Remove invalid point
-      dropoffs.features.pop();
-      delete pointHopper[pt.properties.key];
-      return;
-    }
 
     // Create a GeoJSON feature collection
     const routeGeoJSON = turf.featureCollection([
@@ -76,7 +65,21 @@ const Map = (props) => {
     // Update the `route` source by getting the route source
     // and setting the data equal to routeGeoJSON
     map.current.getSource("route").setData(routeGeoJSON);
+    map.current.setLayoutProperty("routeline-active", "visibility", "visible");
   }
+
+  const reset = () => {
+    // map.current.removeLayer("routeline-active");
+    // map.current.removeLayer("dropoffs-symbol");
+    map.current.setLayoutProperty("routeline-active", "visibility", "none");
+    map.current.getSource("route").setData(turf.featureCollection([]));
+    map.current
+      .getSource("dropoffs-symbol")
+      .setData(turf.featureCollection([]));
+    setDropoffs(turf.featureCollection([]));
+    pointHopper = [];
+    console.log("Reset");
+  };
 
   function updateDropoffs(geojson) {
     map.current.getSource("dropoffs-symbol").setData(geojson);
@@ -84,29 +87,23 @@ const Map = (props) => {
 
   // Here you'll specify all the parameters necessary for requesting a response from the Optimization API
   function assembleQueryURL() {
-    const initialCoords = [
-      initialMarker.current._lngLat.lng,
-      initialMarker.current._lngLat.lat,
-    ];
-    const coordinates = [initialCoords];
+    const coordinates = [startCoords.current];
     const distributions = [];
-    keepTrack = [initialCoords];
+    setKeepTrack([startCoords.current]);
 
     // Create an array of GeoJSON feature collections for each point
-    const restJobs = Object.keys(pointHopper).map((key) => pointHopper[key]);
-
     // If there are actually orders from this restaurant
-    if (restJobs.length > 0) {
-      const needToPickUp = 0;
-
-      console.log(restJobs);
-
-      for (const job of restJobs) {
+    if (pointHopper.length > 0) {
+      for (const job of pointHopper) {
         // Add dropoff to list
-        keepTrack.push(job);
+        setKeepTrack((prev) => [...prev, job]);
         coordinates.push(job.geometry.coordinates);
       }
     }
+
+    console.log("start position: ", startCoords.current);
+    console.log("coordinates :>> ", coordinates);
+    console.log("pointHopper :>> ", pointHopper);
 
     // Set the profile to `driving` (I actually set it to cycling)
     // Coordinates will include the current location of the truck,
@@ -136,7 +133,6 @@ const Map = (props) => {
     map.current.on("load", async () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
-          console.log("position :>> ", position);
           setMapState((prevState) => ({
             longitude: position.coords.longitude,
             latitude: position.coords.latitude,
@@ -153,6 +149,7 @@ const Map = (props) => {
 
           flyToStore(lnglat);
           initialMarker.current = marker;
+          startCoords.current = convertLngLatToArr(marker._lngLat);
         });
       }
 
@@ -199,7 +196,6 @@ const Map = (props) => {
                 [15, 15],
               ],
             },
-
             // // decrease opacity to transition into the circle layer
             // 'heatmap-opacity': {
             //     'default': 1,
@@ -314,14 +310,16 @@ const Map = (props) => {
 
       geocoder.on("result", ({ result }) => {
         // remove initial marker if necessary
-        console.log("initialMarker :>> ", initialMarker.current);
         if (initialMarker.current != null) {
           initialMarker.current.remove();
           initialMarker.current = null;
+          startCoords.current = result.center;
         }
 
+        // get rid of current route
+        reset();
+
         // try to search the surrounding areas using TileQuery
-        props.onClickMarker({}, true);
       });
 
       map.current.addControl(geocoder, "top-left");
@@ -393,7 +391,7 @@ const Map = (props) => {
 
       map.current.addSource("route", {
         type: "geojson",
-        data: nothing,
+        data: turf.featureCollection([]),
       });
 
       map.current.addLayer(
@@ -413,54 +411,37 @@ const Map = (props) => {
         "waterway-label"
       );
 
-      map.current.addLayer(
-        {
-          id: "routearrows",
-          type: "symbol",
-          source: "route",
-          layout: {
-            "symbol-placement": "line",
-            "text-field": "▶",
-            "text-size": ["interpolate", ["linear"], ["zoom"], 12, 24, 22, 60],
-            "symbol-spacing": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              12,
-              30,
-              22,
-              160,
-            ],
-            "text-keep-upright": false,
-          },
-          paint: {
-            "text-color": "#3887be",
-            "text-halo-color": "hsl(55, 11%, 96%)",
-            "text-halo-width": 3,
-          },
-        },
-        "waterway-label"
-      );
+      // map.current.addLayer(
+      //   {
+      //     id: "routearrows",
+      //     type: "symbol",
+      //     source: "route",
+      //     layout: {
+      //       "symbol-placement": "line",
+      //       "text-field": "▶",
+      //       "text-size": ["interpolate", ["linear"], ["zoom"], 12, 24, 22, 60],
+      //       "symbol-spacing": [
+      //         "interpolate",
+      //         ["linear"],
+      //         ["zoom"],
+      //         12,
+      //         30,
+      //         22,
+      //         160,
+      //       ],
+      //       "text-keep-upright": false,
+      //     },
+      //     paint: {
+      //       "text-color": "#3887be",
+      //       "text-halo-color": "hsl(55, 11%, 96%)",
+      //       "text-halo-width": 3,
+      //     },
+      //   },
+      //   "waterway-label"
+      // );
 
       // Listen for a click on the map
       await map.current.on("click", addWaypoints);
-    });
-
-    map.current.on("click", (event) => {
-      const features = map.current.queryRenderedFeatures(event.point, {
-        layers: ["locations"],
-      });
-      if (!features.length) return;
-
-      const clickedPoint = features[0];
-      flyToStore(clickedPoint.geometry.coordinates);
-      props.onClickMarker(
-        {
-          geom: clickedPoint._geometry,
-          properties: clickedPoint.properties,
-        },
-        true
-      );
     });
   });
 

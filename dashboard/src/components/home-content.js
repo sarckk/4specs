@@ -6,7 +6,6 @@ const HomeContent = () => {
   const [showSidebar, setShowSidebar] = useState(false);
 
   const setSidebar = (clickedPoint, show) => {
-    console.log("clickedPoint :>> ", clickedPoint);
     setShowSidebar(show);
   };
 
